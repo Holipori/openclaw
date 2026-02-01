@@ -213,6 +213,42 @@ export async function maybeHandleModelDirectiveInfo(params: {
 
   if (wantsSummary) {
     const current = `${params.provider}/${params.model}`;
+    const currentKey = modelKey(params.provider, params.model);
+
+    // Build inline buttons from configured model aliases + default reset.
+    const buttons: Array<Array<{ text: string; callback_data: string }>> = [];
+    const aliasButtons: Array<{ text: string; callback_data: string }> = [];
+
+    for (const [key, aliases] of params.aliasIndex.byKey) {
+      if (!aliases || aliases.length === 0) {
+        continue;
+      }
+      const alias = aliases[0];
+      const isCurrent = key === currentKey;
+      aliasButtons.push({
+        text: isCurrent ? `✅ ${alias}` : alias,
+        callback_data: `/model ${alias}`,
+      });
+    }
+
+    // Add a "default" button to reset to the configured default model.
+    const defaultKey = modelKey(params.defaultProvider, params.defaultModel);
+    const isDefault = currentKey === defaultKey;
+    // Only add the default button if it's not already represented by an alias.
+    const defaultHasAlias =
+      params.aliasIndex.byKey.has(defaultKey) &&
+      (params.aliasIndex.byKey.get(defaultKey)?.length ?? 0) > 0;
+    if (!defaultHasAlias) {
+      aliasButtons.push({
+        text: isDefault ? "✅ default" : "default",
+        callback_data: "/model default",
+      });
+    }
+
+    if (aliasButtons.length > 0) {
+      buttons.push(aliasButtons);
+    }
+
     return {
       text: [
         `Current: ${current}`,
@@ -221,6 +257,7 @@ export async function maybeHandleModelDirectiveInfo(params: {
         "Browse: /models (providers) or /models <provider> (models)",
         "More: /model status",
       ].join("\n"),
+      ...(buttons.length > 0 ? { channelData: { telegram: { buttons } } } : {}),
     };
   }
 
